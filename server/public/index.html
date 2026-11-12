@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clicker</title>
+<style>
+  :root { --bg:#16121c; --card:#221b2c; --fg:#f3eaf7; --muted:#a493b3; --accent:#ff7ac6; --ok:#6be19a; --bad:#ff6b6b; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg);
+         font: 16px/1.4 system-ui, sans-serif; display:flex; justify-content:center; padding:24px 16px; }
+  main { width:100%; max-width:480px; display:flex; flex-direction:column; gap:16px; }
+  h1 { margin:0; font-size:22px; }
+  .card { background:var(--card); border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  label { font-size:13px; color:var(--muted); }
+  input, textarea { width:100%; background:#140f19; color:var(--fg); border:1px solid #3a2e47;
+                    border-radius:10px; padding:10px 12px; font:inherit; }
+  textarea { resize:vertical; min-height:90px; }
+  .row { display:flex; gap:8px; }
+  .row input { flex:1; text-transform:uppercase; letter-spacing:2px; }
+  button { background:#3a2e47; color:var(--fg); border:0; border-radius:10px; padding:10px 14px; font:inherit; cursor:pointer; }
+  button:hover { filter:brightness(1.15); }
+  #click { background:var(--accent); color:#2a0b1d; font-size:28px; font-weight:700; padding:28px; border-radius:18px; }
+  #click:active { transform:scale(.97); }
+  #click:disabled { opacity:.4; cursor:not-allowed; }
+  .status { font-size:14px; color:var(--muted); }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--bad); margin-right:6px; }
+  .dot.on { background:var(--ok); }
+  .hint { font-size:13px; color:var(--muted); }
+  .toggle { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Clicker</h1>
+
+  <div class="card">
+    <label for="room">Friend's code (shown in their receiver window)</label>
+    <div class="row">
+      <input id="room" maxlength="16" placeholder="ABC123" autocomplete="off">
+      <button id="connect">Link</button>
+    </div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not linked</span></div>
+  </div>
+
+  <button id="click" disabled>CLICK</button>
+  <div class="hint">Shortcut: press <b>Space</b> anywhere outside the text box to click.</div>
+
+  <div class="card">
+    <label for="text">Text on their screen</label>
+    <textarea id="text" maxlength="300" placeholder="type here..."></textarea>
+    <label class="toggle"><input type="checkbox" id="live" checked style="width:auto"> Live (shows as you type). Off = send on Enter</label>
+    <div class="row">
+      <button id="sendText">Send</button>
+      <button id="clear">Clear their screen</button>
+    </div>
+  </div>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id);
+  let ws = null;
+  let friendOnline = false;
+
+  // remember the last code
+  try { $("room").value = localStorage.getItem("clicker-room") || ""; } catch {}
+
+  function setStatus(text, on) {
+    $("statusText").textContent = text;
+    $("dot").classList.toggle("on", on);
+    $("click").disabled = !on;
+  }
+
+  function connect() {
+    const code = $("room").value.trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,16}$/.test(code)) { setStatus("Code should be 4-16 letters/numbers", false); return; }
+    try { localStorage.setItem("clicker-room", code); } catch {}
+    if (ws) { ws.onclose = null; ws.close(); }
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/ws?role=sender&room=${code}`);
+    setStatus("Connecting...", false);
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === "status") {
+        friendOnline = msg.receivers > 0;
+        setStatus(friendOnline ? `Linked to ${code}, friend online` : `Joined ${code}, waiting for friend...`, friendOnline);
+      }
+    };
+    ws.onclose = () => { setStatus("Disconnected, retrying...", false); setTimeout(connect, 2000); };
+  }
+
+  function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+
+  $("connect").onclick = connect;
+  $("room").onkeydown = (e) => { if (e.key === "Enter") connect(); };
+
+  $("click").onclick = () => send({ type: "click" });
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && !["TEXTAREA", "INPUT"].includes(document.activeElement.tagName)) {
+      e.preventDefault();
+      if (!$("click").disabled) { send({ type: "click" }); $("click").animate([{transform:"scale(.97)"},{transform:"scale(1)"}], 120); }
+    }
+  });
+
+  $("text").addEventListener("input", () => { if ($("live").checked) send({ type: "text", text: $("text").value }); });
+  $("text").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      send({ type: "text", text: $("text").value });
+      if (!$("live").checked) $("text").value = "";
+    }
+  });
+  $("sendText").onclick = () => send({ type: "text", text: $("text").value });
+  $("clear").onclick = () => { $("text").value = ""; send({ type: "clear" }); };
+
+  if ($("room").value) connect();
+</script>
+</body>
+</html>
