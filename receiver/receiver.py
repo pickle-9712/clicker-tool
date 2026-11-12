@@ -174,6 +174,9 @@ FIRST_RUN_MARKER = os.path.join(os.path.expanduser("~"), ".clicker_startup_asked
 
 
 def startup_command(server):
+    # Built as a standalone .exe: launch the exe directly.
+    if getattr(sys, "frozen", False):
+        return f'"{sys.executable}" "{server}" --startup'
     exe = sys.executable
     # pythonw.exe runs without a console window
     pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
