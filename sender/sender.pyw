@@ -23,7 +23,8 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import glass
 
-DEFAULT_SERVER = "wss://clicker.femboy.casino"
+# The relay always lives on the domain. (CLICKER_SERVER overrides it for local testing.)
+SERVER = os.environ.get("CLICKER_SERVER", "wss://clicker.femboy.casino")
 SETTINGS_FILE = os.path.join(os.path.expanduser("~"), ".clicker_sender.json")
 
 # translucent palette (sits over the acrylic blur)
@@ -183,12 +184,6 @@ class App:
         hover(self.link_btn, BORDER, ACCENT)
         self.status = tk.Label(link, text="Not linked", bg=CARD, fg=MUTED, font=(FONT, 10))
         self.status.pack(anchor="w", pady=(10, 0))
-        srow = tk.Frame(link, bg=CARD)
-        srow.pack(fill="x", pady=(8, 0))
-        tk.Label(srow, text="Server", bg=CARD, fg=MUTED, font=(FONT, 9)).pack(side="left")
-        self.server = tk.Entry(srow, bg=FIELD, fg=MUTED, insertbackground=FG, relief="flat", font=(FONT, 9))
-        self.server.pack(side="left", fill="x", expand=True, padx=(8, 0), ipady=3)
-        self.server.insert(0, self.settings.get("server", DEFAULT_SERVER))
 
         self.click_btn = tk.Label(self.full, text="CLICK", bg=ACCENT, fg="#2a0b1d",
                                   font=(FONT, 22, "bold"), pady=20, cursor="hand2")
@@ -254,10 +249,9 @@ class App:
             return
         self.room.delete(0, "end")
         self.room.insert(0, code)
-        server = self.server.get().strip() or DEFAULT_SERVER
         self._save()
         self.status.config(text="Connecting...", fg=MUTED)
-        self.conn.connect(server, code)
+        self.conn.connect(SERVER, code)
 
     def _set_online(self, online):
         self.friend_online = online
@@ -327,7 +321,6 @@ class App:
     def _save(self):
         save_settings({
             "room": self.room.get().strip().upper(),
-            "server": self.server.get().strip() or DEFAULT_SERVER,
             "live": self.live.get(), "mini": self.mini,
             "x": self.root.winfo_x(), "y": self.root.winfo_y(),
         })

@@ -30,7 +30,8 @@ try:
 except ImportError:
     sys.exit("Missing dependency. Run:  pip install websocket-client")
 
-DEFAULT_SERVER = "wss://clicker.femboy.casino"
+# The relay always lives on the domain. (CLICKER_SERVER overrides it for local testing.)
+SERVER = os.environ.get("CLICKER_SERVER", "wss://clicker.femboy.casino")
 CODE_FILE = os.path.join(os.path.expanduser("~"), ".clicker_code")
 TEXT_HIDE_AFTER_MS = 5000
 
@@ -173,17 +174,17 @@ RUN_NAME = "ClickerReceiver"
 FIRST_RUN_MARKER = os.path.join(os.path.expanduser("~"), ".clicker_startup_asked")
 
 
-def startup_command(server):
+def startup_command():
     # Built as a standalone .exe: launch the exe directly.
     if getattr(sys, "frozen", False):
-        return f'"{sys.executable}" "{server}" --startup'
+        return f'"{sys.executable}" --startup'
     exe = sys.executable
     # pythonw.exe runs without a console window
     pyw = os.path.join(os.path.dirname(exe), "pythonw.exe")
     if os.path.exists(pyw):
         exe = pyw
     script = os.path.abspath(__file__)
-    return f'"{exe}" "{script}" "{server}" --startup'
+    return f'"{exe}" "{script}" --startup'
 
 
 def startup_enabled():
@@ -198,13 +199,13 @@ def startup_enabled():
         return False
 
 
-def set_startup(enabled, server):
+def set_startup(enabled):
     if sys.platform != "win32":
         return
     import winreg
     with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
         if enabled:
-            winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, startup_command(server))
+            winreg.SetValueEx(k, RUN_NAME, 0, winreg.REG_SZ, startup_command())
         else:
             try:
                 winreg.DeleteValue(k, RUN_NAME)
@@ -214,19 +215,19 @@ def set_startup(enabled, server):
 
 # ---------- UI ----------
 class App:
-    def __init__(self, server, launched_at_startup=False):
+    def __init__(self, launched_at_startup=False):
         self.code = load_code()
-        self.server = server
+        self.server = SERVER
 
         # turn on start-with-Windows the first time; the checkbox turns it off
         if sys.platform == "win32" and not os.path.exists(FIRST_RUN_MARKER):
             try:
-                set_startup(True, server)
+                set_startup(True)
                 open(FIRST_RUN_MARKER, "w").close()
             except OSError:
                 pass
         elif startup_enabled():
-            set_startup(True, server)  # refresh the path in case the script moved
+            set_startup(True)  # refresh the path in case the exe moved
         self.events = queue.Queue()
         self.hide_job = None
 
@@ -245,7 +246,7 @@ class App:
         if sys.platform == "win32":
             self.startup_var = tk.BooleanVar(value=startup_enabled())
             tk.Checkbutton(self.root, text="Start with Windows", variable=self.startup_var,
-                           command=lambda: set_startup(self.startup_var.get(), self.server),
+                           command=lambda: set_startup(self.startup_var.get()),
                            bg="#221b2c", fg=fg, selectcolor="#3a2e47", activebackground="#221b2c",
                            activeforeground=fg, font=("Segoe UI", 10)).pack(pady=(8, 0))
         tk.Button(self.root, text="Quit", command=self.root.destroy, bg="#3a2e47", fg=fg,
@@ -268,7 +269,7 @@ class App:
         self.text_label.pack()
         self.overlay.withdraw()
 
-        threading.Thread(target=network_loop, args=(server, self.code, self.events), daemon=True).start()
+        threading.Thread(target=network_loop, args=(SERVER, self.code, self.events), daemon=True).start()
         self.root.after(30, self.poll)
 
     def show_text(self, text):
@@ -318,6 +319,4 @@ class App:
 
 
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if a != "--startup"]
-    server = args[0] if args else os.environ.get("CLICKER_SERVER", DEFAULT_SERVER)
-    App(server, launched_at_startup="--startup" in sys.argv).run()
+    App(launched_at_startup="--startup" in sys.argv).run()

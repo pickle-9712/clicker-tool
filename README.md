@@ -38,12 +38,15 @@ Caddy sets up HTTPS for you, and WebSockets work with no extra config.
 
 ## 3. Friend runs the receiver
 
+Easiest: give them **ClickerReceiver.exe** from the [Releases page](https://github.com/pickle-9712/clicker-tool/releases) — no Python needed. Or from source:
+
 ```
 pip install websocket-client
-python receiver.py                                # defaults to wss://clicker.femboy.casino
-python receiver.py ws://localhost:8787            # for local testing
+python receiver.py
 ```
-A small window shows their code (for example `K7QX2M`). The code is saved in `~/.clicker_code`, so it stays the same between runs. Closing the window stops everything.
+The server is hardcoded to `wss://clicker.femboy.casino`; there's nothing to configure. A small window shows their code (for example `K7QX2M`). The code is saved in `~/.clicker_code`, so it stays the same between runs. Closing the window stops everything.
+
+> Local testing only: set the `CLICKER_SERVER` environment variable (e.g. `ws://localhost:8787`) before launching either side to point it at a local relay.
 
 ### Starts with Windows
 
@@ -57,9 +60,7 @@ unticking the box leaves no trace.
 
 Two ways to drive it:
 
-**App (recommended).** Double-click `sender/sender.pyw` — a dark control window opens, no browser
-needed (needs `pip install websocket-client`, same as the receiver). It remembers the last code and
-server. The **Server** box lets you point it at `ws://localhost:8787` for local testing.
+**App (recommended).** Run **ClickerSender.exe** from the [Releases page](https://github.com/pickle-9712/clicker-tool/releases), or `pythonw sender/sender.pyw` from source. A frosted-glass control window opens — enter your friend's code and **Link**. The `□` button in the title bar collapses it to a **clicker-only** pad; `▣` expands it back. It always connects to `wss://clicker.femboy.casino`.
 
 **Browser.** Open https://clicker.femboy.casino, enter their code, and click **Link**.
 
